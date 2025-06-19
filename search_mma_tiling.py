@@ -1,50 +1,64 @@
 import numpy as np
+from pprint import pprint
 
 class MMAConfig:
-    def __init__(self, name, bs, m, k, n):
+    def __init__(self, name, bs, m, k, n, weight_bytes, fa_qk, fa_pv):
         self.name = name
         self.bs = bs
         self.m = m
         self.k = k
         self.n = n
+        self.weight_bytes = weight_bytes
+        self.fa_qk = fa_qk
+        self.fa_pv = fa_pv
 
     def __str__(self):
         return f"{self.name}\t bs={self.bs}\t m={self.m}\t k={self.k}\t n={self.n}"
 
 ds_v3_bs32_configs = [
-    MMAConfig("up proj shared", 1, 64, 7168, 4096),
-    MMAConfig("down proj shared", 1, 64, 2048, 7168),
-    MMAConfig("up proj routed", 2, 512, 7168, 4096),
-    MMAConfig("down proj route", 2, 512, 2048, 7168),
-    MMAConfig("q_up", 1, 64, 128, 24576),
-    MMAConfig("Q @ W_{UV}^T", 128, 64, 128, 512),
-    MMAConfig("kv_nope_mm_W_KV_down", 1, 64, 7168, 576),
-    MMAConfig("qK", 32, 256, 576, 8192),
-    MMAConfig("PV", 32, 256, 8192, 512),
-    MMAConfig("O @ W_{UV}", 128, 64, 512, 128),
-    MMAConfig("O proj", 1, 64, 16384, 7168),
+    MMAConfig("up proj shared", 1, 64, 7168, 4096, 1, 0, 0),
+    MMAConfig("down proj shared", 1, 64, 2048, 7168, 1, 0, 0),
+    MMAConfig("up proj routed", 2, 512, 7168, 4096, 1, 0, 0),
+    MMAConfig("down proj route", 2, 512, 2048, 7168, 1, 0, 0),
+    MMAConfig("q_up", 1, 64, 128, 24576, 1, 0, 0),
+    MMAConfig("Q @ W_{UV}^T", 128, 64, 128, 512, 1, 0, 0),
+    MMAConfig("kv_nope_mm_W_KV_down", 1, 64, 7168, 576, 1, 0, 0),
+    MMAConfig("qK", 32, 256, 576, 8192, 1, fa_qk=True, fa_pv=False),
+    MMAConfig("PV", 32, 256, 8192, 512, 1, fa_qk=False, fa_pv=True),
+    MMAConfig("O @ W_{UV}", 128, 64, 512, 128, 1, 0, 0),
+    MMAConfig("O proj", 1, 64, 16384, 7168, 1, 0, 0),
 ]
+
 
 
 mtp_num = 64
-hidden_dim = 5120
-num_q_heads = 64
-num_kv_heads = 8
-group_size = num_q_heads // num_kv_heads
-head_dim = 128
-FA_len_tile = 512
-qwen3_bs1_mtp64_configs = [
-    # MMAConfig("up proj", 1, mtp_num, hidden_dim, 25600 * 2),
-    # MMAConfig("down proj", 1, mtp_num, 25600, hidden_dim),
+sd_mal = 3.5
 
-    MMAConfig("q_proj", 1, mtp_num*8, hidden_dim, num_q_heads * head_dim),
-    # MMAConfig("kv_proj", 1, mtp_num*8, hidden_dim, num_kv_heads * head_dim),
-    # MMAConfig("qk", 1, mtp_num * group_size, head_dim, FA_len_tile),
-    # MMAConfig("pv", 1, mtp_num * group_size, FA_len_tile, head_dim),
-    # MMAConfig("o_proj", 1, mtp_num, num_q_heads * head_dim, hidden_dim),
-]
+def get_qwen3_bs1_mtp64_configs():
+    hidden_dim = 5120
+    num_q_heads = 64
+    num_kv_heads = 8
+    group_size = num_q_heads // num_kv_heads
+    head_dim = 128
+    FA_len_tile = 512
+    total_context_len = 8192
+    n_fa_chunks = total_context_len // FA_len_tile
+    n_layers = 64
+    qwen3_bs1_mtp64_configs = [
+        MMAConfig("up proj", 1, mtp_num, hidden_dim, 25600 * 2, 0.5, 0, 0),
+        MMAConfig("down proj", 1, mtp_num, 25600, hidden_dim, 0.5, 0, 0),
 
-configs = qwen3_bs1_mtp64_configs
+        MMAConfig("q_proj", 1, mtp_num, hidden_dim, num_q_heads * head_dim, 0.5, 0, 0),
+        MMAConfig("kv_proj", 1, mtp_num, hidden_dim, num_kv_heads * head_dim, 0.5, 0, 0),
+
+        MMAConfig("qk", num_kv_heads * n_fa_chunks, mtp_num * group_size, head_dim, FA_len_tile, 1, fa_qk=True, fa_pv=False),
+        MMAConfig("pv", num_kv_heads * n_fa_chunks, mtp_num * group_size, FA_len_tile, head_dim, 1, fa_qk=False, fa_pv=True),
+
+        MMAConfig("o_proj", 1, mtp_num, num_q_heads * head_dim, hidden_dim, 0.5, 0, 0),
+    ]
+    return qwen3_bs1_mtp64_configs, n_layers
+
+configs, n_layers = get_qwen3_bs1_mtp64_configs()
 
 SRAM_size = 2*1024*1024
 DRAM_per_cycle = 24
@@ -72,52 +86,85 @@ def calculate_memory_requirements(m, k, n, tile_m, tile_k, tile_n):
     total_memory = a_memory + b_memory + c_memory
     return total_memory, a_memory, b_memory, c_memory
 
-def compute_per_tile_cycles(tile_m, tile_k, tile_n, still_policy):
-    pass
+def compute_per_tile_cycles(config, tile_m, tile_k, tile_n):
+    m, k, n = config.m, config.k, config.n
+    num_tile_m = np.ceil(m / tile_m)
+    num_tile_k = np.ceil(k / tile_k)
+    num_tile_n = np.ceil(n / tile_n)
+    weight_bytes = config.weight_bytes
+    fa_qk = config.fa_qk
+    fa_pv = config.fa_pv
 
-def calculate_bandwidth_requirements(m, k, n, tile_m, tile_k, tile_n):
+    A_bytes = bytes_per_element
+    B_bytes = weight_bytes
+    C_bytes = bytes_per_acc
+
+    if fa_qk:
+        C_bytes = 0
+    elif fa_pv:
+        A_bytes = 0
+
+    tile_memory_size = \
+        tile_m * tile_k * A_bytes + \
+        tile_k * tile_n * B_bytes + \
+        tile_m * tile_n * C_bytes / num_tile_k
+    bw_bound_cycles = tile_memory_size / DRAM_per_cycle
+    still_policy = "c_still"
+    still_reuse_factor = num_tile_k
+    
+    a_still_tile_memory_size = \
+        tile_m * tile_k * A_bytes / num_tile_n + \
+        tile_k * tile_n * B_bytes + \
+        tile_m * tile_n * C_bytes
+    a_still_bw_bound_cycles = a_still_tile_memory_size / DRAM_per_cycle
+
+    if a_still_bw_bound_cycles < bw_bound_cycles:
+        bw_bound_cycles = a_still_bw_bound_cycles
+        still_policy = "a_still"
+        still_reuse_factor = num_tile_n
+
+    b_still_tile_memory_size = \
+        tile_m * tile_k * A_bytes + \
+        tile_k * tile_n * B_bytes / num_tile_m + \
+        tile_m * tile_n * C_bytes
+    b_still_bw_bound_cycles = b_still_tile_memory_size / DRAM_per_cycle
+
+    if b_still_bw_bound_cycles < bw_bound_cycles:
+        bw_bound_cycles = b_still_bw_bound_cycles
+        still_policy = "b_still"
+        still_reuse_factor = num_tile_m
+
+    ideal_compute_cycles = tile_m * tile_k * tile_n / mult_per_cycle
+    mn_min = min(tile_m, tile_n)
+    if mn_min > 64:
+        compute_bound_cycles = tile_m * tile_k * tile_n / mult_per_cycle
+    else:
+        discounted_mult_per_cycle = mult_per_cycle * mn_min / 64
+        compute_bound_cycles = tile_m * tile_k * tile_n / discounted_mult_per_cycle
+
+    max_cycles = max(bw_bound_cycles, compute_bound_cycles)
+    mfu = ideal_compute_cycles / max_cycles
+
+    return mfu, bw_bound_cycles, compute_bound_cycles, still_policy, still_reuse_factor
+
+
+def calculate_bandwidth_requirements(config, tile_m, tile_k, tile_n):
     # Calculate number of tiles
-    num_tiles_m = (m + tile_m - 1) // tile_m
-    num_tiles_k = (k + tile_k - 1) // tile_k
-    num_tiles_n = (n + tile_n - 1) // tile_n
+    m, k, n = config.m, config.k, config.n
+    num_tile_m = (m + tile_m - 1) // tile_m
+    num_tile_k = (k + tile_k - 1) // tile_k
+    num_tile_n = (n + tile_n - 1) // tile_n
     
-    # Calculate memory bandwidth for each matrix
+    mfu, bw_bound_cycles, compute_bound_cycles, still_policy, still_reuse_factor = compute_per_tile_cycles(config, tile_m, tile_k, tile_n)
+    total_cycles = max(bw_bound_cycles, compute_bound_cycles) * num_tile_m*num_tile_n*num_tile_k
     
-    # keep C still
-    # A matrix: read once for each tile_k
-    a_bandwidth = m * k * bytes_per_element * num_tiles_n
-    # B matrix: read once for each tile_m
-    b_bandwidth = k * n * bytes_per_element * num_tiles_m
-    # C matrix: read and write for each tile
-    c_bandwidth = m * n * bytes_per_acc
-    c_still_bandwidth = a_bandwidth + b_bandwidth + c_bandwidth
+    return total_cycles, mfu, bw_bound_cycles, compute_bound_cycles, still_policy, still_reuse_factor
 
-    # keep A still
-    a_bandwidth = m * k * bytes_per_element
-    # B matrix: read once for each tile_m
-    b_bandwidth = k * n * bytes_per_element * num_tiles_m
-    # C matrix: read and write for each tile
-    c_bandwidth = m * n * bytes_per_acc * num_tiles_k * 2
-    a_still_bandwidth = a_bandwidth + b_bandwidth + c_bandwidth
-
-    # keep B still
-    a_bandwidth = m * k * bytes_per_element * num_tiles_n
-    b_bandwidth = k * n * bytes_per_element
-    c_bandwidth = m * n * bytes_per_acc * num_tiles_k * 2
-    b_still_bandwidth = a_bandwidth + b_bandwidth + c_bandwidth
-
-    print(f"m: {m}, k: {k}, n: {n}, tile_m: {tile_m}, tile_k: {tile_k}, tile_n: {tile_n}")
-    print(f"c_still_bandwidth: {c_still_bandwidth}, a_still_bandwidth: {a_still_bandwidth}, b_still_bandwidth: {b_still_bandwidth}")
-
-    return a_still_bandwidth, b_still_bandwidth, c_still_bandwidth
-
-    
 
 def find_optimal_tiling(config):
     best_tiling = None
-    best_reuse = 0
-    best_bandwidth = float('inf')
-    best_sram_cost = float('inf')
+    best_total_cycles = float('inf')
+    best_info = {}
     
     # Try different tile sizes
     for tile_m in np.arange(tile_quants[0], config.m + tile_quants[0], tile_quants[0]):
@@ -139,78 +186,56 @@ def find_optimal_tiling(config):
                     continue
                 
                 # Calculate bandwidth requirements
-                a_still_bandwidth, b_still_bandwidth, c_still_bandwidth = calculate_bandwidth_requirements(
-                    config.m, config.k, config.n, tile_m, tile_k, tile_n
+                total_cycles, mfu, bw_bound_cycles, compute_bound_cycles, still_policy, still_reuse_factor = calculate_bandwidth_requirements(
+                    config, tile_m, tile_k, tile_n
                 )
+                total_cycles *= config.bs
 
-                bandwidth = min(a_still_bandwidth, b_still_bandwidth, c_still_bandwidth)
-                best_policy = "c_still" if best_bandwidth == c_still_bandwidth else "a_still" if best_bandwidth == a_still_bandwidth else "b_still"
-                
-                # Calculate reuse factor (higher is better)
-                reuse_factor = (config.m * config.k * config.n) / bandwidth
-                
                 # Update best tiling if this is better
-                if bandwidth < best_bandwidth:
-                    print(f"update best bandwidth: {best_bandwidth} -> {bandwidth}")
-                    best_reuse = reuse_factor
-                    best_bandwidth = bandwidth
+                if total_cycles < best_total_cycles:
+                    # print(f"update best total cycles: {best_total_cycles} -> {total_cycles}")
+                    best_total_cycles = total_cycles
                     best_tiling = (tile_m, tile_k, tile_n)
-                    best_policy = best_policy
-                    best_sram_cost = total_memory
-                else:
-                    print(f"skip: {bandwidth} > {best_bandwidth}")
+                    best_info = {
+                        "total_cycles": total_cycles,
+                        "mfu": mfu,
+                        "bw_bound_cycles": bw_bound_cycles,
+                        "compute_bound_cycles": compute_bound_cycles,
+                        "still_policy": still_policy,
+                        "still_reuse_factor": still_reuse_factor,
+                    }
+                    # pprint(best_info)
     
-    return best_tiling, best_reuse, best_bandwidth, best_policy, best_sram_cost
+    return best_tiling, best_info
 
 # Analyze each configuration
 print("Analyzing tiling strategies for each configuration:")
 print("-" * 80)
+cycles = 0
+freq = 2 * 1000 * 1000 * 1000
 for config in configs:
-    best_tiling, best_reuse, best_bandwidth, best_policy, best_sram_cost = find_optimal_tiling(config)
+    best_tiling, best_info = find_optimal_tiling(config)
     if best_tiling:
-        print(f"\nConfiguration: {config}")
-        print(f"Best tiling: M={best_tiling[0]}, K={best_tiling[1]}, N={best_tiling[2]}")
-        print(f"Reuse factor: {best_reuse:.2f}")
-        print(f"Total bandwidth: {best_bandwidth/1024/1024:.2f} MB")
-        print(f"Best policy: {best_policy}")
-        print(f"SRAM cost: {best_sram_cost/1024:.2f} KB")
+        # print(f"\nConfiguration: {config}")
+        # print(f"Best tiling: M={best_tiling[0]}, K={best_tiling[1]}, N={best_tiling[2]}")
+        # print(f"Total cycles: {best_info['total_cycles']}")
+        # print(f"MFU: {best_info['mfu']:.2f}, BW bound cycles: {best_info['bw_bound_cycles']:.2f}, ideal compute cycles: {best_info['compute_bound_cycles']:.2f}, compute bound cycles: {best_info['compute_bound_cycles']:.2f}")
+        # print(f"Still policy: {best_info['still_policy']}, still reuse factor: {best_info['still_reuse_factor']}")
 
-        num_tile_m = np.ceil(config.m / best_tiling[0])
-        num_tile_k = np.ceil(config.k / best_tiling[1])
-        num_tile_n = np.ceil(config.n / best_tiling[2])
-
-        if best_policy == "c_still":
-            tile_memory_size = \
-                best_tiling[0] * best_tiling[1] * bytes_per_element + \
-                best_tiling[1] * best_tiling[2] * bytes_per_element + \
-                best_tiling[0] * best_tiling[2] * bytes_per_acc / num_tile_k
-            bw_bound_cycles = tile_memory_size / DRAM_per_cycle
-        elif best_policy == "a_still":
-            tile_memory_size = \
-                best_tiling[0] * best_tiling[1] * bytes_per_element / num_tile_n + \
-                best_tiling[1] * best_tiling[2] * bytes_per_element + \
-                best_tiling[0] * best_tiling[2] * bytes_per_acc
-            bw_bound_cycles = tile_memory_size / DRAM_per_cycle
-        elif best_policy == "b_still":
-            tile_memory_size = \
-                best_tiling[0] * best_tiling[1] * bytes_per_element + \
-                best_tiling[1] * best_tiling[2] * bytes_per_element / num_tile_m + \
-                best_tiling[0] * best_tiling[2] * bytes_per_acc
-            bw_bound_cycles = tile_memory_size / DRAM_per_cycle
-
-        ideal_compute_cycles = best_tiling[0] * best_tiling[1] * best_tiling[2] / mult_per_cycle
-        mn_min = min(best_tiling[0], best_tiling[2])
-        if mn_min > 64:
-            compute_bound_cycles = best_tiling[0] * best_tiling[1] * best_tiling[2] / mult_per_cycle
-        else:
-            discounted_mult_per_cycle = mult_per_cycle * mn_min / 64
-            compute_bound_cycles = best_tiling[0] * best_tiling[1] * best_tiling[2] / discounted_mult_per_cycle
-
-        max_cycles = max(bw_bound_cycles, ideal_compute_cycles)
-        mfu = ideal_compute_cycles / max_cycles
-        print(f"MFU: {mfu:.2f}, BW bound cycles: {bw_bound_cycles:.2f}, ideal compute cycles: {ideal_compute_cycles:.2f}, compute bound cycles: {compute_bound_cycles:.2f}")
-            
+        time_ms = best_info['total_cycles'] / freq * 1000
+        cycles += best_info['total_cycles']
+        mfu = best_info['mfu']
+        print(f"{config.name.ljust(20)} {time_ms:.4f} ms, MFU: {mfu:.4f}", end=',   ')
+        print(f"M={config.m}, K={config.k}, N={config.n},".ljust(30), end='')
+        print(f"Tiling: M={best_tiling[0]}, K={best_tiling[1]}, N={best_tiling[2]},".ljust(30), end='')
+        print(f"Still policy: {best_info['still_policy']}")
 
     else:
         print(f"\nConfiguration: {config}")
         print("No valid tiling found that fits in SRAM")
+
+print(f"Total cycles: {cycles}")
+layer_time = cycles / freq * 1000
+print(f"Per layer time: {layer_time} ms")
+print(f"Per forward time: {n_layers * layer_time} ms")
+print(f"With spec decode MAL={sd_mal}, Token per second: {1000 / (n_layers * layer_time) * sd_mal}")
