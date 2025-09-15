@@ -32,7 +32,8 @@ ds_v3_bs32_configs = [
 
 
 mtp_num = 64
-sd_mal = 3.5
+sd_mal = 4.0
+DRAM_per_cycle = 16
 
 def get_qwen3_bs1_mtp64_configs():
     hidden_dim = 5120
@@ -45,27 +46,26 @@ def get_qwen3_bs1_mtp64_configs():
     n_fa_chunks = total_context_len // FA_len_tile
     n_layers = 64
     qwen3_bs1_mtp64_configs = [
-        # MMAConfig("up proj", 1, mtp_num, hidden_dim, 25600 * 2, 0.5, 0, 0),
-        # MMAConfig("down proj", 1, mtp_num, 25600, hidden_dim, 0.5, 0, 0),
+        MMAConfig("up proj", 1, mtp_num, hidden_dim, 25600 * 2, 0.5, 0, 0),
+        MMAConfig("down proj", 1, mtp_num, 25600, hidden_dim, 0.5, 0, 0),
 
-        # MMAConfig("q_proj", 1, mtp_num, hidden_dim, num_q_heads * head_dim, 0.5, 0, 0),
-        # MMAConfig("kv_proj", 1, mtp_num, hidden_dim, num_kv_heads * head_dim, 0.5, 0, 0),
+        MMAConfig("q_proj", 1, mtp_num, hidden_dim, num_q_heads * head_dim, 0.5, 0, 0),
+        MMAConfig("kv_proj", 1, mtp_num, hidden_dim, num_kv_heads * head_dim, 0.5, 0, 0),
 
-        # MMAConfig("qk", num_kv_heads * n_fa_chunks, mtp_num * group_size, head_dim, FA_len_tile, 1, fa_qk=True, fa_pv=False),
-        # MMAConfig("pv", num_kv_heads * n_fa_chunks, mtp_num * group_size, FA_len_tile, head_dim, 1, fa_qk=False, fa_pv=True),
+        MMAConfig("qk", num_kv_heads * n_fa_chunks, mtp_num * group_size, max(256, head_dim), FA_len_tile, 1, fa_qk=True, fa_pv=False),
+        MMAConfig("pv", num_kv_heads * n_fa_chunks, mtp_num * group_size, FA_len_tile, head_dim, 1, fa_qk=False, fa_pv=True),
 
-        # MMAConfig("o_proj", 1, mtp_num, num_q_heads * head_dim, hidden_dim, 0.5, 0, 0),
-        MMAConfig("ideal", 1, 2048, 2048, 2048, 1, 0, 0),
+        MMAConfig("o_proj", 1, mtp_num, num_q_heads * head_dim, hidden_dim, 0.5, 0, 0),
+        # MMAConfig("ideal", 1, 2048, 2048, 2048, 1, 0, 0),
     ]
     return qwen3_bs1_mtp64_configs, n_layers
 
 configs, n_layers = get_qwen3_bs1_mtp64_configs()
 
-SRAM_size = 2*1024*1024
-DRAM_per_cycle = 24
+SRAM_size = 1*1024*1024
 mult_per_cycle = 32*8*32
 
-tile_quants = (64, 128, 64)
+tile_quants = (64, 256, 64)
 bytes_per_element = 1  #fp8
 bytes_per_acc = 2  # bf16
 
@@ -161,7 +161,46 @@ def calculate_bandwidth_requirements(config, tile_m, tile_k, tile_n):
     
     return total_cycles, mfu, bw_bound_cycles, compute_bound_cycles, still_policy, still_reuse_factor
 
-def compute_in_sram_info(global_still_policy, tile_m, tile_k, tile_n):
+def search_local_still_policy(config, tile_m, tile_k, tile_n, reg_m, reg_k, reg_n):
+    A_bytes = bytes_per_element
+    B_bytes = bytes_per_element
+    C_bytes = bytes_per_acc
+
+    num_tile_m = (tile_m + reg_m - 1) // reg_m
+    num_tile_k = (tile_k + reg_k - 1) // reg_k
+    num_tile_n = (tile_n + reg_n - 1) // reg_n
+
+    memory_bytes = \
+        tile_m * tile_k * A_bytes + \
+        tile_k * tile_n * B_bytes + \
+        tile_m * tile_n * C_bytes / num_tile_k
+    still_policy = "c_still"
+    still_reuse_factor = num_tile_k
+    
+    a_still_tile_memory_bytes = \
+        tile_m * tile_k * A_bytes / num_tile_n + \
+        tile_k * tile_n * B_bytes + \
+        tile_m * tile_n * C_bytes
+
+    if a_still_tile_memory_bytes < memory_bytes:
+        memory_bytes = a_still_tile_memory_bytes
+        still_policy = "a_still"
+        still_reuse_factor = num_tile_n
+
+    b_still_tile_memory_bytes = \
+        tile_m * tile_k * A_bytes + \
+        tile_k * tile_n * B_bytes / num_tile_m + \
+        tile_m * tile_n * C_bytes
+
+    if b_still_tile_memory_bytes < memory_bytes:
+        memory_bytes = b_still_tile_memory_bytes
+        still_policy = "b_still"
+        still_reuse_factor = num_tile_m
+
+    return still_policy, still_reuse_factor, memory_bytes
+
+
+def compute_in_sram_info(global_still_policy, tile_m, tile_k, tile_n, config: MMAConfig):
     reg_m, reg_k, reg_n = tile_quants
 
     print(f"\ntile_m: {tile_m}, tile_k: {tile_k}, tile_n: {tile_n}")
@@ -174,7 +213,8 @@ def compute_in_sram_info(global_still_policy, tile_m, tile_k, tile_n):
     elif tile_k == reg_k and tile_n == reg_n:
         local_still_policy = "b_still"
     else:
-        raise ValueError(f"Invalid tile sizes: {tile_m}, {tile_k}, {tile_n}")
+        local_still_policy, local_still_reuse_factor, sram_read_bytes = \
+            search_local_still_policy(config, tile_m, tile_k, tile_n, reg_m, reg_k, reg_n)
 
     load_c_to_reg_before_mma = False
     if global_still_policy == "c_still" and local_still_policy != "c_still":
@@ -185,18 +225,16 @@ def compute_in_sram_info(global_still_policy, tile_m, tile_k, tile_n):
         bytes_a = reg_m * reg_k * bytes_per_element / (tile_n / reg_n)
         bytes_b = reg_k * reg_n * bytes_per_element
         bytes_c = reg_m * reg_n * bytes_per_acc
-        macro_op_count = tile_n / reg_n
     elif local_still_policy == "b_still":
         bytes_a = reg_m * reg_k * bytes_per_element
         bytes_b = reg_k * reg_n * bytes_per_element / (tile_m / reg_m)
         bytes_c = reg_m * reg_n * bytes_per_acc
-        macro_op_count = tile_m / reg_m
     else:
         assert local_still_policy == "c_still"
         bytes_a = reg_m * reg_k * bytes_per_element
         bytes_b = reg_k * reg_n * bytes_per_element
         bytes_c = reg_m * reg_n * bytes_per_acc / (tile_k / reg_k)
-        macro_op_count = tile_k / reg_k
+    macro_op_count = (tile_m / reg_m) * (tile_k / reg_k) * (tile_n / reg_n)
 
     load_c_bytes = reg_m * reg_n * bytes_per_acc if load_c_to_reg_before_mma else 0
 
@@ -205,9 +243,9 @@ def compute_in_sram_info(global_still_policy, tile_m, tile_k, tile_n):
     c_count_factor = 2 if load_c_to_reg_before_mma else 1
 
     if global_still_policy == "c_still":
-        dram_usage = tile_m * tile_k * bytes_per_element + tile_k * tile_n * bytes_per_element
+        dram_usage = tile_m * tile_k * bytes_per_element + tile_k * tile_n * config.weight_bytes
     elif global_still_policy == "a_still":
-        dram_usage = tile_k * tile_n * bytes_per_element + tile_m * tile_n * bytes_per_acc
+        dram_usage = tile_k * tile_n * config.weight_bytes + tile_m * tile_n * bytes_per_acc
     elif global_still_policy == "b_still":
         dram_usage = tile_m * tile_k * bytes_per_element + tile_m * tile_n * bytes_per_acc
     else:
@@ -215,7 +253,7 @@ def compute_in_sram_info(global_still_policy, tile_m, tile_k, tile_n):
 
     memory_cycles = dram_usage / DRAM_per_cycle
 
-    sram_bw_per_cycle = byte_loaded_from_sram / memory_cycles
+    sram_bw_per_cycle = byte_loaded_from_sram / memory_cycles + DRAM_per_cycle
 
     print(f"Load A bytes: {bytes_a}, Load B bytes: {bytes_b}, Store C bytes: {bytes_c}, Load C bytes: {load_c_bytes}, Memory usage: {dram_usage}, Memory cycles: {memory_cycles}, SRAM BW per cycle: {sram_bw_per_cycle}")
 
@@ -228,7 +266,7 @@ def compute_in_sram_info(global_still_policy, tile_m, tile_k, tile_n):
         "sram_bw_per_cycle": sram_bw_per_cycle,
     }
 
-def find_optimal_tiling(config):
+def find_optimal_tiling(config, verbose=False):
     best_tiling = None
     best_total_cycles = float('inf')
     best_info = {}
@@ -239,7 +277,8 @@ def find_optimal_tiling(config):
             for tile_n in np.arange(tile_quants[2], config.n + tile_quants[2], tile_quants[2]):
                 # Skip if tile sizes are larger than matrix dimensions
                 if tile_m > config.m or tile_k > config.k or tile_n > config.n:
-                    # print(f"Skipping tile sizes: {tile_m}, {tile_k}, {tile_n} for {config}")
+                    if verbose:
+                        print(f"Skipping tile sizes: {tile_m}, {tile_k}, {tile_n} for {config}")
                     continue
                 
                 # Calculate memory requirements
@@ -249,7 +288,8 @@ def find_optimal_tiling(config):
                 
                 # Skip if doesn't fit in SRAM
                 if total_memory > SRAM_size:
-                    # print(f"Skipping tile sizes: {tile_m}, {tile_k}, {tile_n} for {config} because it doesn't fit in SRAM")
+                    if verbose:
+                        print(f"Skipping tile sizes: {tile_m}, {tile_k}, {tile_n} for {config} because it doesn't fit in SRAM")
                     continue
                 
                 # Calculate bandwidth requirements
@@ -259,8 +299,11 @@ def find_optimal_tiling(config):
                 total_cycles *= config.bs
 
                 # Update best tiling if this is better
+                if verbose:
+                    print(f"tile_m: {tile_m}, tile_k: {tile_k}, tile_n: {tile_n}, total_cycles: {total_cycles}, still_policy: {still_policy}")
                 if total_cycles < best_total_cycles:
-                    # print(f"update best total cycles: {best_total_cycles} -> {total_cycles}")
+                    if verbose:
+                        print(f"update best total cycles: {best_total_cycles} -> {total_cycles}")
                     best_total_cycles = total_cycles
                     best_tiling = (tile_m, tile_k, tile_n)
                     best_info = {
@@ -271,7 +314,8 @@ def find_optimal_tiling(config):
                         "still_policy": still_policy,
                         "still_reuse_factor": still_reuse_factor,
                     }
-                    # pprint(best_info)
+                    if verbose:
+                        pprint(best_info)
     
     return best_tiling, best_info
 
@@ -296,7 +340,7 @@ for config in configs:
         print(f"M={config.m}, K={config.k}, N={config.n},".ljust(30), end='')
         print(f"Tiling: M={best_tiling[0]}, K={best_tiling[1]}, N={best_tiling[2]},".ljust(30), end='')
         print(f"Still policy: {best_info['still_policy']}")
-        in_sram_info = compute_in_sram_info(best_info['still_policy'], best_tiling[0], best_tiling[1], best_tiling[2])
+        in_sram_info = compute_in_sram_info(best_info['still_policy'], best_tiling[0], best_tiling[1], best_tiling[2], config)
 
     else:
         print(f"\nConfiguration: {config}")
