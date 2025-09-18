@@ -1,0 +1,47 @@
+# Conda configuration file for LLM Single Chip Simulation
+
+# Channel priorities
+channels:
+  - conda-forge
+  - pytorch
+  - huggingface
+  - defaults
+
+# Always use conda-forge channel
+channel_priority: flexible
+
+# Solver settings
+solver: libmamba
+
+# Download settings
+download_threads: 4
+use_only_tar_bz2: true
+
+# Safety settings
+safety_checks: enabled
+path_conflict: warn
+
+# Package cache settings
+pkgs_dirs:
+  - ~/.conda/pkgs
+  - /opt/conda/pkgs
+
+# Environment settings
+envs_dirs:
+  - ~/.conda/envs
+  - /opt/conda/envs
+
+# Auto activate base environment
+auto_activate_base: false
+
+# Show channel URLs
+show_channel_urls: true
+
+# Always update dependencies
+update_dependencies: true
+
+# Use pip for packages not available in conda
+pip_interop_enabled: true
+
+
+
