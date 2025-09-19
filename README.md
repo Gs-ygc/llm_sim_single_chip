@@ -1,102 +1,12 @@
-# LLM Single Chip Simulation Framework
+# LLM Workload Chip Simulation Framework
 
 A comprehensive framework for simulating and optimizing Large Language Model (LLM) inference on single-chip hardware accelerators. This project provides cycle-accurate performance modeling, hardware-aware tiling optimization, and intelligent hardware recommendations for modern AI accelerators.
 
-## 📋 TODO
-
-### 🐛 Bug Fixes
-- [ ] **Performance Calculation Bug**: Fix inaccurate performance calculation results for certain models
-- [ ] **Memory Calculation Error**: Fix memory usage calculation deviation for large models
-- [ ] **Tiling Optimization Bug**: Fix tiling strategy selection errors under specific hardware configurations
-- [ ] **CLI Parameter Validation**: Improve command-line parameter validation and error handling
-- [ ] **Model Configuration Parsing**: Fix parsing failures for certain Hugging Face model configurations
-
-### 🚀 Core Feature Enhancements
-- [ ] **Complete MoE Architecture Support**: 
-  - [ ] Implement MoE routing mechanism simulation
-  - [ ] Support dynamic expert selection
-  - [ ] Optimize MoE memory access patterns
-  - [ ] Add MoE-specific performance metrics
-- [ ] **Cache Mechanism Optimization**:
-  - [ ] Implement KV Cache simulation
-  - [ ] Add attention caching strategies
-  - [ ] Optimize cache hit rate calculation
-  - [ ] Support different cache size configurations
-- [ ] **Flash Attention Support**:
-  - [ ] Complete Flash Attention algorithm implementation
-  - [ ] Support different Flash Attention variants
-  - [ ] Optimize memory access patterns
-
-### 🔧 Hardware Simulation Enhancements
-- [ ] **Multi-level Cache Hierarchy**:
-  - [ ] Add L1/L2/L3 cache simulation
-  - [ ] Implement cache coherence protocols
-  - [ ] Support different cache replacement strategies
-- [ ] **Parallel Computing Support**:
-  - [ ] Multi-core parallel computing simulation
-  - [ ] Data parallelism and model parallelism
-  - [ ] Communication overhead modeling
-
-### 📊 Performance Analysis Enhancements
-- [ ] **Detailed Performance Analysis**:
-  - [ ] Add more performance bottleneck analysis
-  - [ ] Implement performance regression detection
-  - [ ] Support performance comparison report generation
-- [ ] **Visualization Improvements**:
-  - [ ] Interactive performance charts
-  - [ ] 3D hardware utilization visualization
-  - [ ] Real-time performance monitoring interface
-- [ ] **Benchmarking**:
-  - [ ] Add standard benchmark test suites
-  - [ ] Compare with real hardware performance
-  - [ ] Automate performance regression testing
-
-### 🎯 Model Support Extensions
-- [ ] **More Model Architectures**:
-- [ ] **Quantization Support**:
-  - [ ] NVFP8/NVFP4 quantization simulation
-
-### 🛠️ Development Tools Improvements
-- [ ] **Test Coverage**:
-  - [ ] Improve unit test coverage
-  - [ ] Add integration tests
-  - [ ] Automate performance testing
-- [ ] **Documentation Enhancement**:
-  - [ ] Auto-generate API documentation
-  - [ ] Improve user guides
-  - [ ] Expand tutorials and examples
-- [ ] **CI/CD Optimization**:
-  - [ ] Automated testing pipeline
-  - [ ] Code quality checks
-  - [ ] Automated release process
-
-### 🔌 Compatibility
-- [ ] **Hardware Platforms**:
-  - [ ] Support more hardware architectures(H800/B300)
-  - [ ] Real hardware validation
-  - [ ] Hardware abstraction layer optimization
-
-### 📈 Advanced Features
-- [ ] **Auto-tuning**:
-  - [ ] Automatic hardware configuration optimization
-  - [ ] Intelligent tiling strategy selection
-  - [ ] Adaptive performance tuning
-- [ ] **Distributed Simulation**:
-  - [ ] Multi-node simulation support
-  - [ ] Network communication modeling
-  - [ ] Load balancing strategies
-- [ ] **Real-time Analysis**:
-  - [ ] Real-time performance monitoring
-  - [ ] Dynamic configuration adjustment
-  - [ ] Online optimization recommendations
-
-
-
 ## 🚀 Features
 
-- **Matrix Multiplication Accelerator (MMA) Simulation**: Cycle-accurate modeling of matrix multiplication operations
+- **Matrix Multiplication Accelerator (MMA) Simulation**: Cycle-accurate modeling of matrix multiplication operations(BUG!)
 - **Hardware-Aware Tiling Optimization**: Automatic search for optimal tiling strategies based on hardware constraints
-- **MoE (Mixture of Experts) Architecture Support**: Analysis of shared and routed experts in modern LLM architectures
+- **MoE (Mixture of Experts) Architecture Support**: Analysis of shared and routed experts in modern LLM architectures(BUG!)
 - **Hardware Configuration Management**: Flexible hardware specifications with predefined presets
 - **Performance Analysis & Visualization**: Detailed performance metrics and bottleneck analysis
 - **Hardware Recommendation Engine**: Intelligent suggestions for optimal hardware configurations
@@ -410,6 +320,95 @@ python examples/optimize_hardware_config.py
 python examples/qwen3_analysis.py
 ```
 
+## 📋 TODO
+
+### 🐛 Bug Fixes
+- [ ] **Performance Calculation Bug**: Fix inaccurate performance calculation results for certain models
+- [ ] **Memory Calculation Error**: Fix memory usage calculation deviation for large models
+- [ ] **Tiling Optimization Bug**: Fix tiling strategy selection errors under specific hardware configurations
+- [ ] **CLI Parameter Validation**: Improve command-line parameter validation and error handling
+- [ ] **Model Configuration Parsing**: Fix parsing failures for certain Hugging Face model configurations
+
+### 🚀 Core Feature Enhancements
+- [ ] **Complete MoE Architecture Support**: 
+  - [ ] Implement MoE routing mechanism simulation
+  - [ ] Support dynamic expert selection
+  - [ ] Optimize MoE memory access patterns
+  - [ ] Add MoE-specific performance metrics
+- [ ] **Cache Mechanism Optimization**:
+  - [ ] Implement KV Cache simulation
+  - [ ] Add attention caching strategies
+  - [ ] Optimize cache hit rate calculation
+  - [ ] Support different cache size configurations
+- [ ] **Flash Attention Support**:
+  - [ ] Complete Flash Attention algorithm implementation
+  - [ ] Support different Flash Attention variants
+  - [ ] Optimize memory access patterns
+
+### 🔧 Hardware Simulation Enhancements
+- [ ] **Multi-level Cache Hierarchy**:
+  - [ ] Add L1/L2/L3 cache simulation
+  - [ ] Implement cache coherence protocols
+  - [ ] Support different cache replacement strategies
+- [ ] **Parallel Computing Support**:
+  - [ ] Multi-core parallel computing simulation
+  - [ ] Data parallelism and model parallelism
+  - [ ] Communication overhead modeling
+
+### 📊 Performance Analysis Enhancements
+- [ ] **Detailed Performance Analysis**:
+  - [ ] Add more performance bottleneck analysis
+  - [ ] Implement performance regression detection
+  - [ ] Support performance comparison report generation
+- [ ] **Visualization Improvements**:
+  - [ ] Interactive performance charts
+  - [ ] 3D hardware utilization visualization
+  - [ ] Real-time performance monitoring interface
+- [ ] **Benchmarking**:
+  - [ ] Add standard benchmark test suites
+  - [ ] Compare with real hardware performance
+  - [ ] Automate performance regression testing
+
+### 🎯 Model Support Extensions
+- [ ] **More Model Architectures**:
+- [ ] **Quantization Support**:
+  - [ ] NVFP8/NVFP4 quantization simulation
+
+### 🛠️ Development Tools Improvements
+- [ ] **Test Coverage**:
+  - [ ] Improve unit test coverage
+  - [ ] Add integration tests
+  - [ ] Automate performance testing
+- [ ] **Documentation Enhancement**:
+  - [ ] Auto-generate API documentation
+  - [ ] Improve user guides
+  - [ ] Expand tutorials and examples
+- [ ] **CI/CD Optimization**:
+  - [ ] Automated testing pipeline
+  - [ ] Code quality checks
+  - [ ] Automated release process
+
+### 🔌 Compatibility
+- [ ] **Hardware Platforms**:
+  - [ ] Support more hardware architectures(H800/B300)
+  - [ ] Real hardware validation
+  - [ ] Hardware abstraction layer optimization
+
+### 📈 Advanced Features
+- [ ] **Auto-tuning**:
+  - [ ] Automatic hardware configuration optimization
+  - [ ] Intelligent tiling strategy selection
+  - [ ] Adaptive performance tuning
+- [ ] **Distributed Simulation**:
+  - [ ] Multi-node simulation support
+  - [ ] Network communication modeling
+  - [ ] Load balancing strategies
+- [ ] **Real-time Analysis**:
+  - [ ] Real-time performance monitoring
+  - [ ] Dynamic configuration adjustment
+  - [ ] Online optimization recommendations
+
+
 ## 🤝 Contributing
 
 We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details.
@@ -453,7 +452,7 @@ If you use this project in your research, please cite:
 
 ## 📞 Support
 
-- **Issues**: [GitHub Issues](https://github.com/Gs-y g c/llm_sim_single_chip/issues)
+- **Issues**: [GitHub Issues](https://github.com/Gs-ygc/llm_sim_single_chip/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/G/llm_sim_single_chip/discussions)
 - **Documentation**: [Project Wiki](https://github.com/Gs-ygc/llm_sim_single_chip/wiki)
 
