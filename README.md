@@ -92,6 +92,9 @@ hw_config = HardwareConfig(
 analyzer = MMAAnalyzer(hw_config)
 results = analyzer.analyze_model("Qwen/Qwen3-1.7B")
 
+# Print matrix sizes for detailed analysis
+analyzer.print_model_matrix_sizes("Qwen/Qwen3-1.7B")
+
 # Get hardware recommendations
 recommender = HardwareRecommender()
 recommendations = recommender.recommend_hardware(
@@ -117,7 +120,8 @@ llm_sim_single_chip/
 ├── examples/                       # Example scripts
 │   ├── qwen3_analysis.py          # Qwen3 model analysis
 │   ├── complete_model_analysis.py  # Comprehensive analysis workflow
-│   └── optimize_hardware_config.py # Hardware optimization
+│   ├── optimize_hardware_config.py # Hardware optimization
+│   └── print_matrix_sizes.py      # Matrix size analysis examples
 ├── scripts/                        # Setup and utility scripts
 │   ├── setup-env.sh               # Linux/Mac environment setup
 │   └── setup-env.bat              # Windows environment setup
@@ -267,6 +271,63 @@ analyzer.compare_models(
 )
 ```
 
+### Matrix Size Analysis
+```python
+from llm_sim import MMAAnalyzer
+
+analyzer = MMAAnalyzer()
+
+# Print detailed matrix sizes for a model
+analyzer.print_model_matrix_sizes("Qwen/Qwen3-8B-FP8")
+
+# This will output:
+# - Model configuration information
+# - Matrix dimensions (M, K, N) for each operation
+# - Memory requirements per operation
+# - Total elements and memory usage
+# - Per-layer and total model statistics
+```
+
+#### Matrix Size Analysis Output Example
+```
+Matrix sizes for model: Qwen/Qwen3-8B-FP8
+================================================================================
+- Model Configuration:
+  Model Name: Qwen/Qwen3-8B-FP8
+  Hidden Size: 4,096
+  Intermediate Size: 12,288
+  Attention Heads: 32
+  Key-Value Heads: 8
+  Head Dimension: 128
+  Number of Layers: 36
+  Vocabulary Size: 151,936
+  Max Position Embeddings: 40,960
+  Estimated Parameters: 7,284,457,472
+
+Matrix Multiplication Operations (per layer):
+--------------------------------------------------------------------------------
+Operation       Batch Size   M        K        N        Total Elements  Memory (MB) 
+--------------------------------------------------------------------------------
+up proj         1            64       4096     12288    50,593,792      48.25       
+down proj       1            64       12288    4096     51,118,080      48.75       
+q_proj          1            64       4096     4096     17,039,360      16.25       
+kv_proj         1            64       4096     1024     4,456,448       4.25        
+qk              128          256      256      512      196,608         0.19        
+pv              128          256      512      128      196,608         0.19        
+o_proj          1            64       4096     4096     17,039,360      16.25       
+--------------------------------------------------------------------------------
+TOTAL (per layer)                                         140,640,256     134.12      
+TOTAL (all layers)                                         5,063,049,216   4828.50     
+
+Model Summary:
+- Number of layers: 36
+- Operations per layer: 7
+- Total operations: 252
+- Memory per layer: 134.12 MB
+- Total model memory: 4828.50 MB
+================================================================================
+```
+
 ## 🛠️ Development
 
 ### Running Tests
@@ -318,6 +379,14 @@ python examples/optimize_hardware_config.py
 ```bash
 # Analyze Qwen3 model series
 python examples/qwen3_analysis.py
+```
+
+### Matrix Size Analysis
+```bash
+# Print detailed matrix sizes for a specific model
+python examples/print_matrix_sizes.py Qwen/Qwen3-8B-FP8
+python examples/print_matrix_sizes.py Qwen/Qwen3-1.7B
+python examples/print_matrix_sizes.py meta-llama/Llama-3.1-8B
 ```
 
 ## 📋 TODO

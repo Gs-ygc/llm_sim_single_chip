@@ -118,6 +118,52 @@ class MMAAnalyzer:
         
         return configs, n_layers
     
+    def print_model_matrix_sizes(self, model_name: str):
+        """Print matrix sizes for all MMA operations in a given model.
+        
+        Args:
+            model_name: Hugging Face model identifier
+        """
+        print(f"Matrix sizes for model: {model_name}")
+        print("=" * 80)
+        
+        # Print model information
+        self._print_model_info(model_name)
+        
+        # Get model configurations
+        configs, n_layers = self.create_model_configs(model_name)
+        
+        print(f"Matrix Multiplication Operations (per layer):")
+        print("-" * 80)
+        print(f"{'Operation':<15} {'Batch Size':<12} {'M':<8} {'K':<8} {'N':<8} {'Total Elements':<15} {'Memory (MB)':<12}")
+        print("-" * 80)
+        
+        total_elements = 0
+        total_memory_mb = 0
+        
+        for config in configs:
+            # Calculate matrix dimensions
+            m, k, n = config.m, config.k, config.n
+            elements = m * k + k * n  # A matrix + B matrix elements
+            memory_mb = elements * self.bytes_per_element / (1024 * 1024)
+            
+            total_elements += elements
+            total_memory_mb += memory_mb
+            
+            print(f"{config.name:<15} {config.bs:<12} {m:<8} {k:<8} {n:<8} {elements:<15,} {memory_mb:<12.2f}")
+        
+        print("-" * 80)
+        print(f"{'TOTAL (per layer)':<15} {'':<12} {'':<8} {'':<8} {'':<8} {total_elements:<15,} {total_memory_mb:<12.2f}")
+        print(f"{'TOTAL (all layers)':<15} {'':<12} {'':<8} {'':<8} {'':<8} {total_elements * n_layers:<15,} {total_memory_mb * n_layers:<12.2f}")
+        
+        print(f"\nModel Summary:")
+        print(f"- Number of layers: {n_layers}")
+        print(f"- Operations per layer: {len(configs)}")
+        print(f"- Total operations: {len(configs) * n_layers}")
+        print(f"- Memory per layer: {total_memory_mb:.2f} MB")
+        print(f"- Total model memory: {total_memory_mb * n_layers:.2f} MB")
+        print("=" * 80)
+    
     def calculate_memory_requirements(self, m: int, k: int, n: int, 
                                     tile_m: int, tile_k: int, tile_n: int) -> Tuple[float, float, float, float]:
         """Calculate memory requirements for tiled matrices.
