@@ -73,18 +73,22 @@ class ModelConfigLoader:
         config = self.load_config(model_name)
         
         # Extract key information
+        hidden_size = config.get("hidden_size", 0)
+        num_attention_heads = config.get("num_attention_heads", 0)
+        
         info = {
             "model_name": model_name,
-            "hidden_size": config.get("hidden_size", 0),
+            "hidden_size": hidden_size,
             "intermediate_size": config.get("intermediate_size", 0),
-            "num_attention_heads": config.get("num_attention_heads", 0),
+            "num_attention_heads": num_attention_heads,
             "num_key_value_heads": config.get("num_key_value_heads", 0),
             "num_hidden_layers": config.get("num_hidden_layers", 0),
-            "head_dim": config.get("head_dim", 0),
+            "head_dim": config.get("head_dim", hidden_size // num_attention_heads if num_attention_heads > 0 else 0),
             "vocab_size": config.get("vocab_size", 0),
             "max_position_embeddings": config.get("max_position_embeddings", 0),
             "model_type": config.get("model_type", "unknown"),
-            "torch_dtype": config.get("torch_dtype", "float32"),
+            "torch_dtype": config.get("dtype", config.get("torch_dtype", "float32")),
+            "architecture": config.get("architectures", [None])[0] if config.get("architectures") else None,
         }
         
         # Calculate derived metrics

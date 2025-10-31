@@ -5,3 +5,5 @@ https://www.zhihu.com/question/1949111518101741882/answer/1949993597375054134
 如何建模找出一个最合适的配比.
 
 vectoc单元和gemm之间需要有共享内存.
+
+如何评价一个矩阵核、AI Core的设计水平.

@@ -121,7 +121,8 @@ llm_sim_single_chip/
 │   ├── qwen3_analysis.py          # Qwen3 model analysis
 │   ├── complete_model_analysis.py  # Comprehensive analysis workflow
 │   ├── optimize_hardware_config.py # Hardware optimization
-│   └── print_matrix_sizes.py      # Matrix size analysis examples
+│   ├── print_matrix_sizes.py      # Matrix size analysis examples
+│   └── print_model_structure.py   # Model structure and operator analysis
 ├── scripts/                        # Setup and utility scripts
 │   ├── setup-env.sh               # Linux/Mac environment setup
 │   └── setup-env.bat              # Windows environment setup
@@ -328,6 +329,75 @@ Model Summary:
 ================================================================================
 ```
 
+#### Model Structure Analysis Output Example
+```
+Model Structure Analysis: Qwen/Qwen3-1.7B
+====================================================================================================
+Model Configuration:
+--------------------------------------------------
+  Model Name: Qwen/Qwen3-1.7B
+  Hidden Size: 2,048
+  Intermediate Size: 6,144
+  Attention Heads: 16
+  Key-Value Heads: 8
+  Head Dimension: 128
+  Number of Layers: 28
+  Vocabulary Size: 151,936
+  Max Position Embeddings: 40,960
+  Estimated Parameters: 1,796,734,976
+
+Linear Operations:
+--------------------------------------------------------------------------------
+Operator                  Type         Dimensions           Count    Total    Acceleration Memory (MB) 
+--------------------------------------------------------------------------------
+up_projection             linear       2048×6144            1        28       TensorCore   1344.00     
+down_projection           linear       6144×2048            1        28       TensorCore   1344.00     
+query_projection          linear       2048×2048            1        28       TensorCore   448.00      
+key_value_projection      linear       2048×1024            1        28       TensorCore   224.00      
+output_projection         linear       2048×2048            1        28       TensorCore   448.00      
+
+Attention Operations:
+--------------------------------------------------------------------------------
+Operator                  Type         Dimensions           Count    Total    Acceleration Memory (MB) 
+--------------------------------------------------------------------------------
+qk_matmul                 matmul       128×128              16       448      TensorCore   28.00       
+pv_matmul                 matmul       128×128              16       448      TensorCore   28.00       
+attention_softmax         softmax      16×128×128           1        28       Vector       28.00       
+
+Normalization Operations:
+--------------------------------------------------------------------------------
+Operator                  Type         Dimensions           Count    Total    Acceleration Memory (MB) 
+--------------------------------------------------------------------------------
+pre_attention_norm        rms_norm     2048                 1        28       Vector       0.22        
+pre_ffn_norm              rms_norm     2048                 1        28       Vector       0.22        
+
+Activation Operations:
+--------------------------------------------------------------------------------
+Operator                  Type         Dimensions           Count    Total    Acceleration Memory (MB) 
+--------------------------------------------------------------------------------
+ffn_activation            silu         6144                 1        28       Vector       0.66        
+
+Embedding Operations:
+--------------------------------------------------------------------------------
+Operator                  Type         Dimensions           Count    Total    Acceleration Memory (MB) 
+--------------------------------------------------------------------------------
+token_embedding           embedding    151936×2048          1        1        Vector       1187.00     
+position_embedding        embedding    40960×2048           1        1        Vector       320.00      
+
+Acceleration Recommendations Summary:
+--------------------------------------------------
+  TensorCore Operations: 1,036
+  Vector Operations: 114
+  Mixed Operations: 0
+  Total Memory Usage: 5400.09 MB
+
+Hardware Recommendations:
+  - TensorCore: Optimize for large matrix multiplications
+  - Vector Units: Optimize for element-wise operations (activations, norms)
+  - Memory Bandwidth: Critical for embedding lookups and attention
+====================================================================================================
+```
+
 ## 🛠️ Development
 
 ### Running Tests
@@ -387,6 +457,14 @@ python examples/qwen3_analysis.py
 python examples/print_matrix_sizes.py Qwen/Qwen3-8B-FP8
 python examples/print_matrix_sizes.py Qwen/Qwen3-1.7B
 python examples/print_matrix_sizes.py meta-llama/Llama-3.1-8B
+```
+
+### Model Structure Analysis
+```bash
+# Print model structure, operators, and acceleration recommendations
+python examples/print_model_structure.py Qwen/Qwen3-8B-FP8
+python examples/print_model_structure.py Qwen/Qwen3-1.7B
+python examples/print_model_structure.py meta-llama/Llama-3.1-8B
 ```
 
 ## 📋 TODO
