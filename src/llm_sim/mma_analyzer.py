@@ -47,16 +47,18 @@ class MMAAnalyzer:
     """Analyzer for Matrix Multiplication Accelerator performance."""
     
     def __init__(self, hardware_config: Optional[HardwareConfig] = None, 
-                 inference_config: Optional[InferenceConfig] = None):
+                 inference_config: Optional[InferenceConfig] = None,
+                 model_source: Optional[str] = None):
         """Initialize MMA analyzer.
         
         Args:
             hardware_config: Hardware configuration. If None, uses default.
             inference_config: Inference configuration. If None, uses default.
+            model_source: Model source ('huggingface' or 'modelscope'). If None, uses default.
         """
         self.hw_config = hardware_config or HardwareConfig()
         self.inference_config = inference_config or InferenceConfig()
-        self.config_loader = ModelConfigLoader()
+        self.config_loader = ModelConfigLoader(model_source=model_source)
         
         # Extract hardware parameters
         self.sram_size = self.hw_config.sram_size
@@ -76,7 +78,7 @@ class MMAAnalyzer:
         """Create MMA configurations for a given model.
         
         Args:
-            model_name: Hugging Face model identifier
+            model_name: Model identifier (from Hugging Face or ModelScope)
             
         Returns:
             List of MMA configurations for the model
@@ -107,9 +109,9 @@ class MMAAnalyzer:
             MMAConfig("kv_proj", self.inference_config.default_batch_size, self.mtp_num, hidden_dim, num_kv_heads * head_dim, 0.5, 0, 0),
             
             # Flash Attention layers
-            MMAConfig("qk", flash_attention_batch_size, self.mtp_num * group_size, 
+            MMAConfig("fa-qk", flash_attention_batch_size, self.mtp_num * group_size, 
                      max(256, head_dim), fa_len_tile, 1, fa_qk=True, fa_pv=False),
-            MMAConfig("pv", flash_attention_batch_size, self.mtp_num * group_size, 
+            MMAConfig("fa-pv", flash_attention_batch_size, self.mtp_num * group_size, 
                      fa_len_tile, head_dim, 1, fa_qk=False, fa_pv=True),
             
             # Output projection
@@ -273,6 +275,7 @@ class MMAAnalyzer:
 
         # Compute cycles
         ideal_compute_cycles = tile_m * tile_k * tile_n / self.mult_per_cycle
+        # ideal_compute_cycles = ideal_compute_cycles + tile_m*tile_n/8
         mn_min = min(tile_m, tile_n)
         if mn_min > 64:
             compute_bound_cycles = tile_m * tile_k * tile_n / self.mult_per_cycle

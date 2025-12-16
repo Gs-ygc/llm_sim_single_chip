@@ -50,7 +50,9 @@ class ModelStructureAnalyzer:
             "uint8": 1,
             "bool": 1,
         }
-        return dtype_mapping.get(dtype.lower(), 4)  # Default to float32 if unknown
+        # Guard against None or unexpected types
+        normalized = (dtype or "float32").lower()
+        return dtype_mapping.get(normalized, 4)  # Default to float32 if unknown
     
     def get_operator_info(self, operator_type: str, dimensions: Tuple[int, ...], dtype: str = None) -> Dict[str, Any]:
         """Get information about an operator including acceleration recommendations."""
@@ -1248,7 +1250,8 @@ class ModelStructureAnalyzer:
         num_hidden_layers = model_info["num_hidden_layers"]
         
         # Get dtype and bytes per element
-        dtype = self.torch_dtype or model_info.get("torch_dtype", "float32")
+        # Ensure dtype never becomes None
+        dtype = self.torch_dtype or model_info.get("torch_dtype") or "float32"
         bytes_per_element = self._get_bytes_per_element(dtype)
         
         print("Inference Phase Analysis:")

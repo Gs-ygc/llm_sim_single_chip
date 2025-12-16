@@ -11,7 +11,7 @@ A comprehensive framework for simulating and optimizing Large Language Model (LL
 - **Performance Analysis & Visualization**: Detailed performance metrics and bottleneck analysis
 - **Hardware Recommendation Engine**: Intelligent suggestions for optimal hardware configurations
 - **Command-Line Interface**: Easy-to-use CLI for common analysis tasks
-- **Hugging Face Integration**: Seamless support for models from Hugging Face Hub
+- **Multi-Source Model Support**: Seamless integration with both Hugging Face Hub and ModelScope (魔塔社区)
 
 ## 📋 Quick Start
 
@@ -53,6 +53,11 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 
 # Install dependencies
 pip install -r requirements.txt
+
+# Optional: Install ModelScope support (魔塔社区)
+pip install modelscope
+
+# Install package in development mode
 pip install -e .
 ```
 
@@ -60,8 +65,11 @@ pip install -e .
 
 #### Command Line Interface
 ```bash
-# Analyze a model's performance
+# Analyze a model's performance (Hugging Face)
 llm-sim analyze Qwen/Qwen3-1.7B
+
+# Analyze a model from ModelScope (魔塔社区)
+llm-sim analyze qwen/Qwen3-1.7B --source modelscope
 
 # Get hardware recommendations
 llm-sim recommend Qwen/Qwen3-4B --use-case datacenter --target-tps 10.0
@@ -71,15 +79,23 @@ llm-sim compare Qwen/Qwen3-1.7B Qwen/Qwen3-4B Qwen/Qwen3-8B
 
 # Compare hardware configurations
 llm-sim compare-hardware Qwen/Qwen3-1.7B --hardware mobile datacenter research
+
+# Use environment variable to set default model source
+export LLM_SIM_MODEL_SOURCE=modelscope  # or huggingface
+llm-sim analyze qwen/Qwen3-1.7B
 ```
 
 #### Python API
 ```python
 from llm_sim import ModelConfigLoader, MMAAnalyzer, HardwareConfig, HardwareRecommender
 
-# Load model configuration
+# Load model configuration from Hugging Face (default)
 config_loader = ModelConfigLoader()
 model_config = config_loader.load_config("Qwen/Qwen3-1.7B")
+
+# Or load from ModelScope (魔塔社区)
+config_loader_ms = ModelConfigLoader(model_source="modelscope")
+model_config_ms = config_loader_ms.load_config("qwen/Qwen3-1.7B")
 
 # Create hardware configuration
 hw_config = HardwareConfig(
@@ -91,6 +107,10 @@ hw_config = HardwareConfig(
 # Analyze performance
 analyzer = MMAAnalyzer(hw_config)
 results = analyzer.analyze_model("Qwen/Qwen3-1.7B")
+
+# Analyze with ModelScope
+analyzer_ms = MMAAnalyzer(hw_config, model_source="modelscope")
+results_ms = analyzer_ms.analyze_model("qwen/Qwen3-1.7B")
 
 # Print matrix sizes for detailed analysis
 analyzer.print_model_matrix_sizes("Qwen/Qwen3-1.7B")

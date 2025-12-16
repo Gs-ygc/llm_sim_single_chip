@@ -22,18 +22,20 @@ class TestModelConfigLoader:
         """Test ModelConfigLoader initialization."""
         assert isinstance(self.loader.cache, dict)
         assert len(self.loader.cache) == 0
+        assert self.loader.adapter is not None
+        assert self.loader.current_source is not None
     
-    @patch('llm_sim.config_loader.AutoConfig')
-    def test_load_config_success(self, mock_auto_config):
+    @patch('llm_sim.model_source.HuggingFaceAdapter.load_config')
+    def test_load_config_success(self, mock_load_config):
         """Test successful configuration loading."""
-        # Mock the AutoConfig
+        # Mock the adapter's load_config method
         mock_config = MagicMock()
         mock_config.to_dict.return_value = {
             "hidden_size": 2048,
             "num_attention_heads": 16,
             "model_type": "qwen3"
         }
-        mock_auto_config.from_pretrained.return_value = mock_config
+        mock_load_config.return_value = mock_config
         
         # Test loading
         config = self.loader.load_config("Qwen/Qwen3-1.7B")
@@ -41,12 +43,14 @@ class TestModelConfigLoader:
         assert config["hidden_size"] == 2048
         assert config["num_attention_heads"] == 16
         assert config["model_name"] == "Qwen/Qwen3-1.7B"
-        assert "Qwen/Qwen3-1.7B" in self.loader.cache
+        assert config["model_source"] == self.loader.current_source
+        cache_key = f"{self.loader.current_source}:Qwen/Qwen3-1.7B"
+        assert cache_key in self.loader.cache
     
-    @patch('llm_sim.config_loader.AutoConfig')
-    def test_load_config_failure(self, mock_auto_config):
+    @patch('llm_sim.model_source.HuggingFaceAdapter.load_config')
+    def test_load_config_failure(self, mock_load_config):
         """Test configuration loading failure."""
-        mock_auto_config.from_pretrained.side_effect = Exception("Model not found")
+        mock_load_config.side_effect = Exception("Model not found")
         
         with pytest.raises(RuntimeError, match="Failed to load configuration"):
             self.loader.load_config("NonExistent/Model")
@@ -77,8 +81,8 @@ class TestModelConfigLoader:
         with pytest.raises(RuntimeError, match="Failed to load configuration"):
             self.loader.load_config_from_file("non_existent_file.json")
     
-    @patch('llm_sim.config_loader.AutoConfig')
-    def test_get_model_info(self, mock_auto_config):
+    @patch('llm_sim.model_source.HuggingFaceAdapter.load_config')
+    def test_get_model_info(self, mock_load_config):
         """Test getting model information."""
         mock_config = MagicMock()
         mock_config.to_dict.return_value = {
@@ -93,7 +97,7 @@ class TestModelConfigLoader:
             "model_type": "qwen3",
             "torch_dtype": "bfloat16"
         }
-        mock_auto_config.from_pretrained.return_value = mock_config
+        mock_load_config.return_value = mock_config
         
         info = self.loader.get_model_info("Qwen/Qwen3-1.7B")
         
@@ -107,17 +111,17 @@ class TestModelConfigLoader:
     def test_cache_functionality(self):
         """Test caching functionality."""
         # First load should populate cache
-        with patch('llm_sim.config_loader.AutoConfig') as mock_auto_config:
+        with patch('llm_sim.model_source.HuggingFaceAdapter.load_config') as mock_load_config:
             mock_config = MagicMock()
             mock_config.to_dict.return_value = {"test": "data"}
-            mock_auto_config.from_pretrained.return_value = mock_config
+            mock_load_config.return_value = mock_config
             
             config1 = self.loader.load_config("Test/Model", use_cache=True)
             config2 = self.loader.load_config("Test/Model", use_cache=True)
             
-            # Should only call AutoConfig once due to caching
-            assert mock_auto_config.from_pretrained.call_count == 1
-            assert config1 == config2
+            # Should only call load_config once due to caching
+            assert mock_load_config.call_count == 1
+            assert config1["test"] == config2["test"]
 
 
 if __name__ == "__main__":

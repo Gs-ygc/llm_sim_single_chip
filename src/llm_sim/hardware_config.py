@@ -132,9 +132,9 @@ class HardwarePresets:
         """XSAI reference configuration (same as current default)."""
         return HardwareConfig(
             sram_size=1 * 1024 * 1024,    # 1MB
-            dram_bandwidth=128,            # 16 bytes/cycle
-            sram_bandwidth=128,           # 32 bytes/cycle (on-chip is wider)
-            mult_per_cycle=32 * 8 * 32,   # same compute as default
+            dram_bandwidth=16,            # 16 bytes/cycle
+            sram_bandwidth=32,           # 32 bytes/cycle (on-chip is wider)
+            mult_per_cycle=256 * 256 * 256,   # same compute as default
             bytes_per_element=1,          # FP8
             bytes_per_acc=2,              # BF16
             tile_quants=(64, 256, 64),

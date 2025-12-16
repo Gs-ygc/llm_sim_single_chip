@@ -23,21 +23,26 @@ class HardwareRecommendation:
 class HardwareRecommender:
     """Recommends optimal hardware configurations for LLM models."""
     
-    def __init__(self):
-        """Initialize hardware recommender."""
+    def __init__(self, model_source: Optional[str] = None):
+        """Initialize hardware recommender.
+        
+        Args:
+            model_source: Model source ('huggingface' or 'modelscope'). If None, uses default.
+        """
         self.presets = HardwarePresets()
+        self.model_source = model_source
     
     def analyze_with_hardware(self, model_name: str, hardware_config: HardwareConfig) -> Dict:
         """Analyze model performance with specific hardware configuration.
         
         Args:
-            model_name: Hugging Face model identifier
+            model_name: Model identifier (from Hugging Face or ModelScope)
             hardware_config: Hardware configuration to test
             
         Returns:
             Analysis results
         """
-        analyzer = MMAAnalyzer(hardware_config)
+        analyzer = MMAAnalyzer(hardware_config, model_source=self.model_source)
         return analyzer.analyze_model(model_name)
     
     def recommend_hardware(self, model_name: str, 
@@ -47,7 +52,7 @@ class HardwareRecommender:
         """Recommend hardware configurations for a model.
         
         Args:
-            model_name: Hugging Face model identifier
+            model_name: Model identifier (from Hugging Face or ModelScope)
             target_tokens_per_second: Target performance (optional)
             max_cost: Maximum cost category ("low", "medium", "high")
             use_case: Use case ("mobile", "edge", "datacenter", "research")

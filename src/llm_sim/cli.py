@@ -29,7 +29,9 @@ def analyze_model_cmd(args):
     # Create inference config (can be extended to support different inference presets)
     inf_config = InferenceConfig()
     
-    analyzer = MMAAnalyzer(hw_config, inf_config)
+    # Create analyzer with model source
+    model_source = getattr(args, 'source', None)
+    analyzer = MMAAnalyzer(hw_config, inf_config, model_source=model_source)
     results = analyzer.analyze_model(args.model, verbose=args.verbose, explain=args.explain)
     analyzer.print_analysis_summary(results, explain=args.explain)
 
@@ -38,7 +40,8 @@ def recommend_hardware_cmd(args):
     """Recommend hardware for a model."""
     print(f"# Recommending hardware for: {args.model}")
     
-    recommender = HardwareRecommender()
+    model_source = getattr(args, 'source', None)
+    recommender = HardwareRecommender(model_source=model_source)
     recommendations = recommender.recommend_hardware(
         model_name=args.model,
         target_tokens_per_second=args.target_tps,
@@ -53,7 +56,8 @@ def compare_models_cmd(args):
     """Compare multiple models."""
     print(f"> Comparing models: {', '.join(args.models)}")
     
-    recommender = HardwareRecommender()
+    model_source = getattr(args, 'source', None)
+    recommender = HardwareRecommender(model_source=model_source)
     comparison_results = []
     
     for model_name in args.models:
@@ -64,7 +68,7 @@ def compare_models_cmd(args):
         )
         
         best_rec = recommendations[0]
-        analyzer = MMAAnalyzer(best_rec.hardware_config)
+        analyzer = MMAAnalyzer(best_rec.hardware_config, model_source=model_source)
         results = analyzer.analyze_model(model_name)
         
         comparison_results.append({
@@ -129,7 +133,8 @@ def compare_hardware_cmd(args):
     baseline = args.baseline if args.baseline else list(hardware_configs.keys())[0]
     
     # Create analyzer and run comparison
-    analyzer = MMAAnalyzer()
+    model_source = getattr(args, 'source', None)
+    analyzer = MMAAnalyzer(model_source=model_source)
     comparison = analyzer.compare_hardware_configs(
         model_name=args.model,
         hardware_configs=hardware_configs,
@@ -182,7 +187,8 @@ def compare_combinations_cmd(args):
             baseline = (baseline_parts[0], baseline_parts[1])
     
     # Create analyzer and run comparison
-    analyzer = MMAAnalyzer()
+    model_source = getattr(args, 'source', None)
+    analyzer = MMAAnalyzer(model_source=model_source)
     comparison = analyzer.compare_models_and_hardware(
         model_hardware_pairs=combinations,
         baseline_pair=baseline,
@@ -206,6 +212,9 @@ Examples:
   # Analyze with specific hardware
   llm-sim analyze Qwen/Qwen3-1.7B --hardware mobile
   
+  # Analyze a model from ModelScope (魔塔社区)
+  llm-sim --source modelscope analyze qwen/Qwen3-1.7B
+  
   # Get hardware recommendations
   llm-sim recommend Qwen/Qwen3-1.7B --target-tps 10 --use-case mobile
   
@@ -217,8 +226,15 @@ Examples:
   
   # Compare model-hardware combinations
   llm-sim compare-combinations Qwen/Qwen3-1.7B:mobile Qwen/Qwen3-1.7B:xsai Qwen/Qwen3-4B:datacenter
+
+Environment Variables:
+  LLM_SIM_MODEL_SOURCE  Default model source (huggingface or modelscope)
         """
     )
+    
+    # Global arguments
+    parser.add_argument('--source', choices=['huggingface', 'modelscope'],
+                       help='Model source (default: huggingface or from LLM_SIM_MODEL_SOURCE env)')
     
     subparsers = parser.add_subparsers(dest='command', help='Available commands')
     
