@@ -2,12 +2,14 @@
 numpy>=1.21.0
 torch>=2.9.0
 torchvision>=0.24.0
-transformers>=4.30.0
-huggingface_hub>=0.16.0
 
-# Optional: ModelScope support (魔塔社区)
-# Uncomment the following line to enable ModelScope integration:
+# Model source: ModelScope (魔塔社区) - default
 modelscope>=1.9.0
+
+# Optional: Hugging Face support (for international users)
+# Uncomment the following lines to enable Hugging Face integration:
+# transformers>=4.30.0
+# huggingface_hub>=0.16.0
 
 # Optional dependencies for enhanced functionality
 matplotlib>=3.5.0

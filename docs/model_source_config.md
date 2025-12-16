@@ -5,27 +5,27 @@ This document explains how to configure and use different model sources (Hugging
 ## Overview
 
 The framework supports loading models from two sources:
-- **Hugging Face Hub** (default): https://huggingface.co
-- **ModelScope (魔塔社区)**: https://modelscope.cn
+- **ModelScope (魔塔社区)** (default): https://modelscope.cn
+- **Hugging Face Hub**: https://huggingface.co
 
 This flexibility allows users to access models from different repositories based on their region, network conditions, or model availability.
 
 ## Installation
 
-### Hugging Face (Default)
+### ModelScope (Default)
 
-Hugging Face support is included by default:
-
-```bash
-pip install transformers huggingface_hub
-```
-
-### ModelScope
-
-To enable ModelScope support, install the additional package:
+ModelScope support is included by default:
 
 ```bash
 pip install modelscope
+```
+
+### Hugging Face
+
+To enable Hugging Face support, install the additional packages:
+
+```bash
+pip install transformers huggingface_hub
 ```
 
 ## Configuration Methods
@@ -37,13 +37,13 @@ pip install modelscope
 ```python
 from llm_sim import ModelConfigLoader
 
-# Use Hugging Face (default)
-loader_hf = ModelConfigLoader(model_source="huggingface")
-config_hf = loader_hf.load_config("Qwen/Qwen3-1.7B")
-
-# Use ModelScope
+# Use ModelScope (default)
 loader_ms = ModelConfigLoader(model_source="modelscope")
 config_ms = loader_ms.load_config("qwen/Qwen3-1.7B")
+
+# Use Hugging Face
+loader_hf = ModelConfigLoader(model_source="huggingface")
+config_hf = loader_hf.load_config("Qwen/Qwen3-1.7B")
 ```
 
 #### Using MMAAnalyzer

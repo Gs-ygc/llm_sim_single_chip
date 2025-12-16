@@ -206,41 +206,41 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Analyze a model with default hardware
-  llm-sim analyze Qwen/Qwen3-1.7B
+  # Analyze a model with default hardware (ModelScope - default)
+  llm-sim analyze qwen/Qwen3-1.7B
   
   # Analyze with specific hardware
-  llm-sim analyze Qwen/Qwen3-1.7B --hardware mobile
+  llm-sim analyze qwen/Qwen3-1.7B --hardware mobile
   
-  # Analyze a model from ModelScope (魔塔社区)
-  llm-sim --source modelscope analyze qwen/Qwen3-1.7B
+  # Analyze a model from Hugging Face
+  llm-sim --source huggingface analyze Qwen/Qwen3-1.7B
   
   # Get hardware recommendations
-  llm-sim recommend Qwen/Qwen3-1.7B --target-tps 10 --use-case mobile
+  llm-sim recommend qwen/Qwen3-1.7B --target-tps 10 --use-case mobile
   
   # Compare multiple models
-  llm-sim compare Qwen/Qwen3-0.6B Qwen/Qwen3-1.7B Qwen/Qwen3-4B
+  llm-sim compare qwen/Qwen3-0.6B qwen/Qwen3-1.7B qwen/Qwen3-4B
   
   # Compare hardware configurations for a model
-  llm-sim compare-hardware Qwen/Qwen3-1.7B --hardware mobile xsai --baseline mobile
+  llm-sim compare-hardware qwen/Qwen3-1.7B --hardware mobile xsai --baseline mobile
   
   # Compare model-hardware combinations
-  llm-sim compare-combinations Qwen/Qwen3-1.7B:mobile Qwen/Qwen3-1.7B:xsai Qwen/Qwen3-4B:datacenter
+  llm-sim compare-combinations qwen/Qwen3-1.7B:mobile qwen/Qwen3-1.7B:xsai qwen/Qwen3-4B:datacenter
 
 Environment Variables:
-  LLM_SIM_MODEL_SOURCE  Default model source (huggingface or modelscope)
+  LLM_SIM_MODEL_SOURCE  Override default model source (default: modelscope)
         """
     )
     
     # Global arguments
     parser.add_argument('--source', choices=['huggingface', 'modelscope'],
-                       help='Model source (default: huggingface or from LLM_SIM_MODEL_SOURCE env)')
+                       help='Model source (default: modelscope or from LLM_SIM_MODEL_SOURCE env)')
     
     subparsers = parser.add_subparsers(dest='command', help='Available commands')
     
     # Analyze command
     analyze_parser = subparsers.add_parser('analyze', help='Analyze a model')
-    analyze_parser.add_argument('model', help='Model name (e.g., Qwen/Qwen3-1.7B)')
+    analyze_parser.add_argument('model', help='Model name (e.g., qwen/Qwen3-1.7B for ModelScope)')
     analyze_parser.add_argument('--hardware', choices=['xsai', 'mobile', 'datacenter', 'research'], 
                                help='Hardware configuration to use')
     analyze_parser.add_argument('--verbose', '-v', action='store_true', 

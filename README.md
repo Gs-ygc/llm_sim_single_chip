@@ -51,11 +51,11 @@ cd llm_sim_single_chip
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 
-# Install dependencies
+# Install dependencies (includes ModelScope by default)
 pip install -r requirements.txt
 
-# Optional: Install ModelScope support (魔塔社区)
-pip install modelscope
+# Optional: Install Hugging Face support (for international users)
+# pip install transformers huggingface_hub
 
 # Install package in development mode
 pip install -e .
@@ -65,11 +65,11 @@ pip install -e .
 
 #### Command Line Interface
 ```bash
-# Analyze a model's performance (Hugging Face)
-llm-sim analyze Qwen/Qwen3-1.7B
+# Analyze a model's performance (ModelScope - default)
+llm-sim analyze qwen/Qwen3-1.7B
 
-# Analyze a model from ModelScope (魔塔社区)
-llm-sim analyze qwen/Qwen3-1.7B --source modelscope
+# Analyze a model from Hugging Face
+llm-sim --source huggingface analyze Qwen/Qwen3-1.7B
 
 # Get hardware recommendations
 llm-sim recommend Qwen/Qwen3-4B --use-case datacenter --target-tps 10.0
@@ -80,22 +80,22 @@ llm-sim compare Qwen/Qwen3-1.7B Qwen/Qwen3-4B Qwen/Qwen3-8B
 # Compare hardware configurations
 llm-sim compare-hardware Qwen/Qwen3-1.7B --hardware mobile datacenter research
 
-# Use environment variable to set default model source
-export LLM_SIM_MODEL_SOURCE=modelscope  # or huggingface
-llm-sim analyze qwen/Qwen3-1.7B
+# Use environment variable to override default model source
+export LLM_SIM_MODEL_SOURCE=huggingface  # default is modelscope
+llm-sim analyze Qwen/Qwen3-1.7B
 ```
 
 #### Python API
 ```python
 from llm_sim import ModelConfigLoader, MMAAnalyzer, HardwareConfig, HardwareRecommender
 
-# Load model configuration from Hugging Face (default)
+# Load model configuration from ModelScope (default)
 config_loader = ModelConfigLoader()
-model_config = config_loader.load_config("Qwen/Qwen3-1.7B")
+model_config = config_loader.load_config("qwen/Qwen3-1.7B")
 
-# Or load from ModelScope (魔塔社区)
-config_loader_ms = ModelConfigLoader(model_source="modelscope")
-model_config_ms = config_loader_ms.load_config("qwen/Qwen3-1.7B")
+# Or load from Hugging Face
+config_loader_hf = ModelConfigLoader(model_source="huggingface")
+model_config_hf = config_loader_hf.load_config("Qwen/Qwen3-1.7B")
 
 # Create hardware configuration
 hw_config = HardwareConfig(

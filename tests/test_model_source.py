@@ -54,7 +54,7 @@ def test_factory_default_adapter():
         del os.environ["LLM_SIM_MODEL_SOURCE"]
     
     adapter = ModelSourceFactory.get_default_adapter()
-    assert isinstance(adapter, HuggingFaceAdapter)
+    assert isinstance(adapter, ModelScopeAdapter)
 
 
 def test_factory_default_from_env():

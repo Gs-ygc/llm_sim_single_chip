@@ -206,12 +206,12 @@ class ModelSourceFactory:
         """Get the default model source adapter.
         
         Returns:
-            Default model source adapter (Hugging Face)
+            Default model source adapter (ModelScope)
         """
         # Check environment variable for default source
-        env_source = os.environ.get("LLM_SIM_MODEL_SOURCE", ModelSource.HUGGINGFACE.value)
+        env_source = os.environ.get("LLM_SIM_MODEL_SOURCE", ModelSource.MODELSCOPE.value)
         try:
             return cls.get_adapter_from_string(env_source)
         except ValueError:
-            # Fallback to Hugging Face if environment variable is invalid
-            return cls.create_adapter(ModelSource.HUGGINGFACE)
+            # Fallback to ModelScope if environment variable is invalid
+            return cls.create_adapter(ModelSource.MODELSCOPE)
